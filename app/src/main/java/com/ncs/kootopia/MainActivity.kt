@@ -96,6 +96,22 @@ class MainActivity : ComponentActivity() {
                                     compileOutput = output
                                     showCompilerInterface = true
                                 }
+                            },
+                            onSaveClick = { fileName ->
+                                saveFile(fileName)
+                                currentFileName = fileName
+                            },
+                            onExecuteClick = {
+                                compileCode(context, editorState.textField.value.text, fileManager, currentFileName) { output ->
+                                    compileOutput = output
+                                    showCompilerInterface = true
+                                }
+                            },
+                            onRenameFile = { newFileName ->
+                                // Save current content with new filename
+                                fileManager.saveFile(newFileName, editorState.textField.value.text)
+                                // Update current filename
+                                currentFileName = newFileName
                             }
                         ) { innerPadding ->
                             Column(modifier = Modifier.padding(innerPadding)) {

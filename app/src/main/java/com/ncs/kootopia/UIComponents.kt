@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,12 +31,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -74,13 +80,52 @@ fun MainEditorScaffold(
     onRedoClick: () -> Unit,
     onFindClick: () -> Unit,
     onCompileClick: () -> Unit,
+    onSaveClick: (String) -> Unit,
+    onExecuteClick: () -> Unit,
+    onRenameFile: (String) -> Unit,
     content: @Composable (PaddingValues) -> Unit
 ) {
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var fileNameInput by remember { mutableStateOf("") }
+    var fileNameError by remember { mutableStateOf("") }
+    var showSaveConfirmation by remember { mutableStateOf(false) }
+    var savedFileName by remember { mutableStateOf("") }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameInput by remember { mutableStateOf("") }
+    var renameError by remember { mutableStateOf("") }
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(text = "Code Editor $currentFileName", color = KootopiaColors.textPrimary) },
+                title = { 
+                    Row {
+                        Text(text = "Kootopia", color = KootopiaColors.textPrimary)
+                        Text(
+                            text = if (currentFileName.isNotEmpty()) {
+                                if (currentFileName.length > 20) {
+                                    "${currentFileName.take(17)}..."
+                                } else {
+                                    " - $currentFileName"
+                                }
+                            } else {
+                                " - Untitled"
+                            },
+                            color = KootopiaColors.textSecondary,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .clickable(
+                                    indication = null,
+                                    interactionSource = remember { MutableInteractionSource() }
+                                ) {
+                                    if (currentFileName.isNotEmpty()) {
+                                        renameInput = currentFileName
+                                        renameError = ""
+                                        showRenameDialog = true
+                                    }
+                                }
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
                         Icon(
@@ -91,12 +136,31 @@ fun MainEditorScaffold(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onEditClick) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Editing Option",
-                            tint = KootopiaColors.textPrimary
+                    TextButton(
+                        onClick = { 
+                            if (currentFileName.isEmpty()) {
+                                showSaveDialog = true
+                                fileNameInput = ""
+                                fileNameError = ""
+                            } else {
+                                onSaveClick(currentFileName)
+                                savedFileName = currentFileName
+                                showSaveConfirmation = true
+                            }
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                            contentColor = KootopiaColors.accentBlue
                         )
+                    ) {
+                        Text("Save")
+                    }
+                    TextButton(
+                        onClick = onExecuteClick,
+                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                            contentColor = KootopiaColors.accentBlue
+                        )
+                    ) {
+                        Text("Execute")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -107,6 +171,13 @@ fun MainEditorScaffold(
         bottomBar = {
             BottomAppBar(
                 actions = {
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Editing Option",
+                            tint = KootopiaColors.textPrimary
+                        )
+                    }
                     IconButton(onClick = onUndoClick) {
                         Icon(
                             painter = painterResource(id = R.drawable.undo),
@@ -142,10 +213,200 @@ fun MainEditorScaffold(
     ) { innerPadding ->
         content(innerPadding)
     }
+    
+    // Save Dialog
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showSaveDialog = false
+                fileNameError = ""
+            },
+            title = { Text("Save File", color = KootopiaColors.textPrimary) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = fileNameInput,
+                        onValueChange = { 
+                            fileNameInput = it
+                            fileNameError = ""
+                        },
+                        label = { Text("File name", color = KootopiaColors.textSecondary) },
+                        placeholder = { Text("e.g., myfile.txt", color = KootopiaColors.textSecondary) },
+                        isError = fileNameError.isNotEmpty(),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = KootopiaColors.textPrimary,
+                            unfocusedTextColor = KootopiaColors.textPrimary,
+                            focusedLabelColor = KootopiaColors.accentBlue,
+                            unfocusedLabelColor = KootopiaColors.textSecondary,
+                            focusedBorderColor = KootopiaColors.accentBlue,
+                            unfocusedBorderColor = KootopiaColors.textSecondary
+                        )
+                    )
+                    if (fileNameError.isNotEmpty()) {
+                        Text(
+                            text = fileNameError,
+                            color = KootopiaColors.errorRed,
+                            style = TextStyle(fontSize = 12.sp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val fileName = fileNameInput.trim()
+                        if (fileName.isEmpty()) {
+                            fileNameError = "Please enter a file name"
+                        } else if (!fileName.contains(".")) {
+                            fileNameError = "Please include a file extension (e.g., .txt, .py, .kt)"
+                        } else {
+                            onSaveClick(fileName)
+                            savedFileName = fileName
+                            showSaveDialog = false
+                            fileNameError = ""
+                            showSaveConfirmation = true
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("Save", color = KootopiaColors.textPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showSaveDialog = false
+                        fileNameError = ""
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = KootopiaColors.textSecondary
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = KootopiaColors.surfaceDark
+        )
+    }
+    
+    // Save Confirmation Dialog
+    if (showSaveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showSaveConfirmation = false },
+            title = { 
+                Text(
+                    "File Saved", 
+                    color = KootopiaColors.successGreen
+                ) 
+            },
+            text = {
+                Text(
+                    "File '$savedFileName' has been saved successfully!",
+                    color = KootopiaColors.textPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showSaveConfirmation = false },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.successGreen
+                    )
+                ) {
+                    Text("OK", color = KootopiaColors.textPrimary)
+                }
+            },
+            containerColor = KootopiaColors.surfaceDark
+        )
+    }
+    
+    // Rename Dialog
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showRenameDialog = false
+                renameError = ""
+            },
+            title = { Text("Rename File", color = KootopiaColors.textPrimary) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = renameInput,
+                        onValueChange = { 
+                            renameInput = it
+                            renameError = ""
+                        },
+                        label = { Text("New file name", color = KootopiaColors.textSecondary) },
+                        placeholder = { Text("e.g., myfile.txt", color = KootopiaColors.textSecondary) },
+                        isError = renameError.isNotEmpty(),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = KootopiaColors.textPrimary,
+                            unfocusedTextColor = KootopiaColors.textPrimary,
+                            focusedLabelColor = KootopiaColors.accentBlue,
+                            unfocusedLabelColor = KootopiaColors.textSecondary,
+                            focusedBorderColor = KootopiaColors.accentBlue,
+                            unfocusedBorderColor = KootopiaColors.textSecondary
+                        )
+                    )
+                    if (renameError.isNotEmpty()) {
+                        Text(
+                            text = renameError,
+                            color = KootopiaColors.errorRed,
+                            style = TextStyle(fontSize = 12.sp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val newName = renameInput.trim()
+                        if (newName.isEmpty()) {
+                            renameError = "Please enter a file name"
+                        } else if (!newName.contains(".")) {
+                            renameError = "Please include a file extension (e.g., .txt, .py, .kt)"
+                        } else if (newName.contains("/") || newName.contains("\\") || newName.contains(":") || 
+                                  newName.contains("*") || newName.contains("?") || newName.contains("\"") || 
+                                  newName.contains("<") || newName.contains(">") || newName.contains("|")) {
+                            renameError = "File name contains invalid characters. Avoid: / \\ : * ? \" < > |"
+                        } else if (newName.length > 255) {
+                            renameError = "File name is too long (maximum 255 characters)"
+                        } else {
+                            onRenameFile(newName)
+                            showRenameDialog = false
+                            renameError = ""
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("Rename", color = KootopiaColors.textPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showRenameDialog = false
+                        renameError = ""
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = KootopiaColors.textSecondary
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = KootopiaColors.surfaceDark
+        )
+    }
 }
 
 /**
- * Code Editor - The main text editing component
+ * Kootopia Editor - The main text editing component
  */
 @Composable
 fun CodeEditor(

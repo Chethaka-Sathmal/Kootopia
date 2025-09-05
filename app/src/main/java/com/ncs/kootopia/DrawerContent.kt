@@ -44,7 +44,11 @@ fun DrawerContent(
     var showDialog = remember { mutableStateOf(false) }
     var showSaveDialog = remember { mutableStateOf(false) }
     var showOpenDialog = remember { mutableStateOf(false) }
-    val extensions = listOf(".kt", ".txt", ".java")
+    var fileNameError = remember { mutableStateOf("") }
+    var expanded = remember { mutableStateOf(false) }
+    var showSaveConfirmation = remember { mutableStateOf(false) }
+    var savedFileName = remember { mutableStateOf("") }
+    val extensions = listOf(".kt", ".txt", ".java", ".py", ".js", ".html", ".css", ".xml")
     var selectedExtension = remember { mutableStateOf(extensions.first()) }
 
 
@@ -132,32 +136,120 @@ fun DrawerContent(
 
     // Show "Save File" dialog
     if (showSaveDialog.value) {
-
-
-
         AlertDialog(
-            onDismissRequest = { showSaveDialog.value = false },
-            confirmButton = {
-                TextButton(onClick = {
-
-                    val finalName = if (fileName.value.endsWith(selectedExtension.value)) {
-                        fileName.value
-                    } else {
-                        fileName.value + selectedExtension.value
+            onDismissRequest = { 
+                showSaveDialog.value = false
+                fileNameError.value = ""
+            },
+            title = { Text("Save File", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = fileName.value,
+                        onValueChange = { 
+                            fileName.value = it
+                            fileNameError.value = ""
+                        },
+                        label = { Text("File name", color = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary) },
+                        placeholder = { Text("e.g., myfile.txt", color = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary) },
+                        isError = fileNameError.value.isNotEmpty(),
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
+                            unfocusedTextColor = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
+                            focusedLabelColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue,
+                            unfocusedLabelColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary,
+                            focusedBorderColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue,
+                            unfocusedBorderColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
+                        )
+                    )
+                    
+                    // Extension selection
+                    Button(
+                        onClick = { expanded.value = !expanded.value },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
+                        )
+                    ) {
+                        Text("Select extension: ${selectedExtension.value}", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = "Arrow Down",
+                            tint = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                        )
                     }
-
-                    onSaveFile(finalName)
-                    fileName.value = ""
-                    showSaveDialog.value = false
-                }) { Text("OK") }
+                    
+                    DropdownMenu(
+                        expanded = expanded.value,
+                        onDismissRequest = { expanded.value = false }
+                    ) {
+                        extensions.forEach { ext ->
+                            DropdownMenuItem(
+                                text = { Text(ext, color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary) },
+                                onClick = {
+                                    selectedExtension.value = ext
+                                    expanded.value = false
+                                }
+                            )
+                        }
+                    }
+                    
+                    if (fileNameError.value.isNotEmpty()) {
+                        Text(
+                            text = fileNameError.value,
+                            color = com.ncs.kootopia.ui.theme.KootopiaColors.errorRed,
+                            style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val trimmedName = fileName.value.trim()
+                        if (trimmedName.isEmpty()) {
+                            fileNameError.value = "Please enter a file name"
+                        } else if (!trimmedName.contains(".")) {
+                            fileNameError.value = "Please include a file extension (e.g., .txt, .py, .kt)"
+                        } else {
+                            val finalName = if (trimmedName.endsWith(selectedExtension.value)) {
+                                trimmedName
+                            } else {
+                                trimmedName + selectedExtension.value
+                            }
+                            onSaveFile(finalName)
+                            savedFileName.value = finalName
+                            fileName.value = ""
+                            fileNameError.value = ""
+                            showSaveDialog.value = false
+                            showSaveConfirmation.value = true
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("Save", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
+                }
             },
             dismissButton = {
-                TextButton(onClick = { showSaveDialog.value = false }) { Text("Cancel") }
+                TextButton(
+                    onClick = { 
+                        showSaveDialog.value = false
+                        fileNameError.value = ""
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
+                    )
+                ) {
+                    Text("Cancel")
+                }
             },
-            title = { Text("Save the file")
-
-            }
-
+            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
         )
     }
     // Show "Open File" dialog
@@ -188,6 +280,36 @@ fun DrawerContent(
                     Text("Cancel")
                 }
             }
+        )
+    }
+    
+    // Save Confirmation Dialog
+    if (showSaveConfirmation.value) {
+        AlertDialog(
+            onDismissRequest = { showSaveConfirmation.value = false },
+            title = { 
+                Text(
+                    "File Saved", 
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.successGreen
+                ) 
+            },
+            text = {
+                Text(
+                    "File '${savedFileName.value}' has been saved successfully!",
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showSaveConfirmation.value = false },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.successGreen
+                    )
+                ) {
+                    Text("OK", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
+                }
+            },
+            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
         )
     }
 }
