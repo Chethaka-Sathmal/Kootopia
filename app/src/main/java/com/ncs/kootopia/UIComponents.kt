@@ -299,7 +299,7 @@ fun MainEditorScaffold(
             title = { 
                 Text(
                     "File Saved", 
-                    color = KootopiaColors.successGreen
+                    color = KootopiaColors.textPrimary
                 ) 
             },
             text = {
@@ -312,7 +312,7 @@ fun MainEditorScaffold(
                 Button(
                     onClick = { showSaveConfirmation = false },
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = KootopiaColors.successGreen
+                        containerColor = KootopiaColors.accentBlue
                     )
                 ) {
                     Text("OK", color = KootopiaColors.textPrimary)

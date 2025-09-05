@@ -290,7 +290,7 @@ fun DrawerContent(
             title = { 
                 Text(
                     "File Saved", 
-                    color = com.ncs.kootopia.ui.theme.KootopiaColors.successGreen
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
                 ) 
             },
             text = {
@@ -303,7 +303,7 @@ fun DrawerContent(
                 Button(
                     onClick = { showSaveConfirmation.value = false },
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.successGreen
+                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue
                     )
                 ) {
                     Text("OK", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
