@@ -1,6 +1,7 @@
 package com.ncs.kootopia
 
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,6 +35,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var fileManager: FileManager
     private var currentFileName by mutableStateOf("Untitled")
     private val editorState = TextEditorState()
+    private var hasUnsavedChanges by mutableStateOf(false)
+    private var autoSaveEnabled by mutableStateOf(true)
 
     override fun onPause() {
         super.onPause()
@@ -58,14 +61,26 @@ class MainActivity : ComponentActivity() {
             val scope = rememberCoroutineScope()
             val context = LocalContext.current
 
-            // Auto-save and commit changes
+            // Track unsaved changes in real-time
             LaunchedEffect(editorState.textField.value) {
-                snapshotFlow { editorState.textField.value }
-                    .debounce(500)
-                    .collect {
-                        editorState.commitChange()
-                        saveFile(currentFileName)
-                    }
+                hasUnsavedChanges = editorState.hasUnsavedChanges()
+                Log.d("MainActivity", "hasUnsavedChanges updated: $hasUnsavedChanges")
+            }
+
+            // Auto-save and commit changes (but don't update hasUnsavedChanges here)
+            // Only auto-save if enabled
+            LaunchedEffect(editorState.textField.value, autoSaveEnabled) {
+                if (autoSaveEnabled) {
+                    snapshotFlow { editorState.textField.value }
+                        .debounce(2000) // 2 seconds
+                        .collect {
+                            Log.d("MainActivity", "Auto-saving...")
+                            editorState.commitChange()
+                            saveFile(currentFileName)
+                        }
+                } else {
+                    Log.d("MainActivity", "Auto-save disabled")
+                }
             }
 
             fileManager = FileManager(context)
@@ -76,9 +91,17 @@ class MainActivity : ComponentActivity() {
                         DrawerContent(
                             initialFileName = currentFileName,
                             context = this,
+                            hasUnsavedChanges = hasUnsavedChanges,
+                            autoSaveEnabled = autoSaveEnabled,
                             onNewFile = { createNewFile(it) },
+                            onNewUntitledFile = { createNewUntitledFile() },
                             onOpenFile = { openFile(it) },
-                            onSaveFile = { saveFile(it) }
+                            onSaveFile = { saveFile(it) },
+                            onToggleAutoSave = { autoSaveEnabled = !autoSaveEnabled },
+                            onConfigure = { 
+                                // TODO: Implement configure functionality
+                                // This could open settings, preferences, or configuration dialog
+                            }
                         )
                     }
                 ) {
@@ -168,19 +191,32 @@ class MainActivity : ComponentActivity() {
         val file = fileManager.createNewFile(filename)
         currentFileName = file
         editorState.textField.value = TextFieldValue("")
+        editorState.forceCommit()
+        hasUnsavedChanges = false
+    }
+
+    // Create a new untitled file
+    private fun createNewUntitledFile() {
+        currentFileName = "Untitled"
+        editorState.textField.value = TextFieldValue("")
+        editorState.forceCommit()
+        hasUnsavedChanges = false
     }
 
     // Save current editor content to a file (This function takes lambda callbacks for New, Open, and Save actions in DrawerContent)
     private fun saveFile(filename: String ) {
         fileManager.saveFile(filename, editorState.textField.value.text)
+        editorState.forceCommit()
+        hasUnsavedChanges = false
     }
 
     // Open a file and load its content into the editor (This function takes lambda callbacks for New, Open, and Save actions in DrawerContent)
-
     private fun openFile(filename: String) {
         val content = fileManager.openFile(filename)
         editorState.textField.value = TextFieldValue(content)
         currentFileName = filename
+        editorState.forceCommit()
+        hasUnsavedChanges = false
     }
 
 

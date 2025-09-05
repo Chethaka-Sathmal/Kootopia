@@ -69,4 +69,16 @@ class TextEditorState(initialText: TextFieldValue = TextFieldValue("")) {
         }
         return false
     }
+
+    // Check if there are unsaved changes
+    fun hasUnsavedChanges(): Boolean {
+        val hasChanges = textField.value.text != lastCommittedText.text
+        Log.d("TextEditorState", "hasUnsavedChanges: $hasChanges, current: '${textField.value.text}', lastCommitted: '${lastCommittedText.text}'")
+        return hasChanges
+    }
+
+    // Force commit current changes (useful when saving)
+    fun forceCommit() {
+        lastCommittedText = textField.value
+    }
 }
