@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
                     BackgroundClickHandler {
                         MainEditorScaffold(
                             currentFileName = currentFileName,
+                            editorState = editorState,
                             onMenuClick = { scope.launch { drawerState.open() } },
                             onEditClick = { showMiniToolbar = !showMiniToolbar },
                             onUndoClick = { editorState.undo() },

@@ -75,6 +75,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainEditorScaffold(
     currentFileName: String,
+    editorState: TextEditorState,
     onMenuClick: () -> Unit,
     onEditClick: () -> Unit,
     onUndoClick: () -> Unit,
@@ -185,46 +186,9 @@ fun MainEditorScaffold(
             content(PaddingValues(0.dp))
         }
         
-        // Bottom App Bar
-        BottomAppBar(
-            actions = {
-                IconButton(onClick = onEditClick) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Editing Option",
-                        tint = KootopiaColors.textPrimary
-                    )
-                }
-                IconButton(onClick = onUndoClick) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.undo),
-                        contentDescription = "Undo",
-                        tint = KootopiaColors.textPrimary
-                    )
-                }
-                IconButton(onClick = onRedoClick) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.redo),
-                        contentDescription = "Redo",
-                        tint = KootopiaColors.textPrimary
-                    )
-                }
-                IconButton(onClick = onFindClick) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Find",
-                        tint = KootopiaColors.textPrimary
-                    )
-                }
-                IconButton(onClick = onCompileClick) {
-                    Icon(
-                        imageVector = Icons.Default.AccountBox,
-                        contentDescription = "Compile",
-                        tint = KootopiaColors.textPrimary
-                    )
-                }
-            },
-            containerColor = KootopiaColors.surfaceDark
+        // Slim Bottom Status Bar
+        SlimBottomStatusBar(
+            editorState = editorState
         )
     }
     
@@ -657,4 +621,61 @@ fun SecondaryHeader(
             }
         }
     }
+}
+
+/**
+ * Slim Bottom Status Bar - Shows character count and cursor position
+ */
+@Composable
+fun SlimBottomStatusBar(
+    editorState: TextEditorState
+) {
+    val editorText = editorState.textField.value
+    val characterCount = editorText.text.length
+    val (row, col) = calculateCursorPosition(editorText)
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(KootopiaColors.surfaceDark)
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .padding(bottom = 16.dp), // Add bottom padding to prevent it from being too low
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+    ) {
+        // Character count
+        Text(
+            text = "Chars: $characterCount",
+            color = KootopiaColors.textSecondary,
+            style = TextStyle(fontSize = 12.sp)
+        )
+        
+        // Cursor position
+        Text(
+            text = "Row: $row, Col: $col",
+            color = KootopiaColors.textSecondary,
+            style = TextStyle(fontSize = 12.sp)
+        )
+    }
+}
+
+/**
+ * Calculate word count from text
+ */
+fun calculateWordCount(text: String): Int {
+    if (text.isBlank()) return 0
+    return text.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }.size
+}
+
+/**
+ * Calculate cursor position (row and column) from TextFieldValue
+ */
+fun calculateCursorPosition(textFieldValue: TextFieldValue): Pair<Int, Int> {
+    val text = textFieldValue.text
+    val cursorPosition = textFieldValue.selection.start
+    
+    val lines = text.substring(0, cursorPosition).split("\n")
+    val row = lines.size
+    val col = if (lines.isNotEmpty()) lines.last().length + 1 else 1
+    
+    return Pair(row, col)
 }
