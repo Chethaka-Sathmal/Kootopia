@@ -30,6 +30,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,12 +80,13 @@ fun MainEditorScaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(text = "Code Editor $currentFileName") },
+                title = { Text(text = "Code Editor $currentFileName", color = KootopiaColors.textPrimary) },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Menu Bar"
+                            contentDescription = "Menu Bar",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
                 },
@@ -92,10 +94,14 @@ fun MainEditorScaffold(
                     IconButton(onClick = onEditClick) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "Editing Option"
+                            contentDescription = "Editing Option",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = KootopiaColors.surfaceDark
+                )
             )
         },
         bottomBar = {
@@ -104,28 +110,33 @@ fun MainEditorScaffold(
                     IconButton(onClick = onUndoClick) {
                         Icon(
                             painter = painterResource(id = R.drawable.undo),
-                            contentDescription = "Undo"
+                            contentDescription = "Undo",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
                     IconButton(onClick = onRedoClick) {
                         Icon(
                             painter = painterResource(id = R.drawable.redo),
-                            contentDescription = "Redo"
+                            contentDescription = "Redo",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
                     IconButton(onClick = onFindClick) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Find"
+                            contentDescription = "Find",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
                     IconButton(onClick = onCompileClick) {
                         Icon(
                             imageVector = Icons.Default.AccountBox,
-                            contentDescription = "Compile"
+                            contentDescription = "Compile",
+                            tint = KootopiaColors.textPrimary
                         )
                     }
-                }
+                },
+                containerColor = KootopiaColors.surfaceDark
             )
         }
     ) { innerPadding ->
@@ -175,12 +186,11 @@ fun CodeEditor(
                 .padding(end = 4.dp)) {
                 lines.forEachIndexed { i, _ ->
                     Text(
-                        text = "${i + 1}.",
+                        text = "${i + 1}",
                         style = TextStyle(fontSize = 16.sp, color = KootopiaColors.textSecondary),
                         modifier = Modifier
                             .height(24.dp)
                             .padding(vertical = 2.dp)
-                            .background(KootopiaColors.surfaceDark)
                     )
                 }
             }

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.ncs.kootopia.ui.theme.KootopiaColors
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
@@ -39,7 +40,7 @@ fun MiniToolbar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.LightGray)
+            .background(KootopiaColors.surfaceDark)
             .padding(8.dp),
     ) {
         TextButton(
@@ -48,20 +49,20 @@ fun MiniToolbar(
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
-        ) { Text("Cut") }
+        ) { Text("Cut", color = KootopiaColors.textPrimary) }
         TextButton(
             onClick = {
                 onCopy()
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
-        ) { Text("Copy") }
+        ) { Text("Copy", color = KootopiaColors.textPrimary) }
         TextButton(
             onClick = {
                 onPaste()
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
-        ) { Text("Paste") }
+        ) { Text("Paste", color = KootopiaColors.textPrimary) }
     }
 }
