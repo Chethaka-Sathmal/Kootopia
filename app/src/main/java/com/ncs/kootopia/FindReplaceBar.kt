@@ -1,13 +1,17 @@
 package com.ncs.kootopia
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.ncs.kootopia.ui.theme.KootopiaColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 
 
@@ -39,6 +45,8 @@ fun FindReplaceBar(
 ) {
     var findText = remember { mutableStateOf("") }
     var replaceText = remember { mutableStateOf("") }
+    var showError = remember { mutableStateOf(false) }
+    var errorMessage = remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     
@@ -50,42 +58,106 @@ fun FindReplaceBar(
 
     AlertDialog(
         onDismissRequest = { onClose() },
-        title = { Text("Find and Replace") },
+        title = { Text("Find and Replace", color = KootopiaColors.textPrimary) },
         text = {
             Column {
                 OutlinedTextField(
                     value = findText.value,
                     onValueChange = { findText.value = it },
-                    label = { Text("Find") },
+                    label = { Text("Find", color = KootopiaColors.textSecondary) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequester)
+                        .focusRequester(focusRequester),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = KootopiaColors.textPrimary,
+                        unfocusedTextColor = KootopiaColors.textPrimary,
+                        focusedLabelColor = KootopiaColors.accentBlue,
+                        unfocusedLabelColor = KootopiaColors.textSecondary,
+                        focusedBorderColor = KootopiaColors.accentBlue,
+                        unfocusedBorderColor = KootopiaColors.textSecondary
+                    )
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = replaceText.value,
                     onValueChange = { replaceText.value = it },
-                    label = { Text("Replace") },
+                    label = { Text("Replace", color = KootopiaColors.textSecondary) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = KootopiaColors.textPrimary,
+                        unfocusedTextColor = KootopiaColors.textPrimary,
+                        focusedLabelColor = KootopiaColors.accentBlue,
+                        unfocusedLabelColor = KootopiaColors.textSecondary,
+                        focusedBorderColor = KootopiaColors.accentBlue,
+                        unfocusedBorderColor = KootopiaColors.textSecondary
+                    )
                 )
+                
+                if (showError.value) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage.value,
+                        color = KootopiaColors.errorRed,
+                        style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp)
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                editorState.replace(findText.value, replaceText.value)
-                onClose()
-            }) {
-                Text("Replace")
+            Column(
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        showError.value = false
+                        val success = editorState.replaceAll(findText.value, replaceText.value)
+                        if (!success) {
+                            errorMessage.value = "Search term '${findText.value}' not found"
+                            showError.value = true
+                        } else {
+                            onClose()
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.accentBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Replace All", color = KootopiaColors.textPrimary)
+                }
+                
+                Button(
+                    onClick = {
+                        showError.value = false
+                        val success = editorState.replace(findText.value, replaceText.value)
+                        if (!success) {
+                            errorMessage.value = "Search term '${findText.value}' not found"
+                            showError.value = true
+                        } else {
+                            onClose()
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.accentBlue
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Replace", color = KootopiaColors.textPrimary)
+                }
+                
+                TextButton(
+                    onClick = { onClose() },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = KootopiaColors.textSecondary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Cancel")
+                }
             }
-            Button(onClick = {
-                editorState.replaceAll(findText.value, replaceText.value)
-                onClose()
-            }) {
-                Text("Replace All")
-            }
-        }
-
+        },
+        containerColor = KootopiaColors.surfaceDark
     )
 }

@@ -112,7 +112,18 @@ class MainActivity : ComponentActivity() {
                                 fileManager.saveFile(newFileName, editorState.textField.value.text)
                                 // Update current filename
                                 currentFileName = newFileName
-                            }
+                            },
+                            onCopyClick = { showDialog ->
+                                val start = editorState.textField.value.selection.start
+                                val end = editorState.textField.value.selection.end
+                                if (start == end) {
+                                    // No text selected - show dialog
+                                    showDialog()
+                                } else {
+                                    copyText(editorState.textField.value, clipboardManager)
+                                }
+                            },
+                            onPasteClick = { pasteText(editorState.textField.value, { editorState.onTextChange(it) }, clipboardManager) }
                         ) { innerPadding ->
                             Column(modifier = Modifier.padding(innerPadding)) {
                                 if (showCompilerInterface) {

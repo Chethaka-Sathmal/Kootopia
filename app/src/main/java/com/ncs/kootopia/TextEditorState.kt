@@ -46,23 +46,27 @@ class TextEditorState(initialText: TextFieldValue = TextFieldValue("")) {
     }
 
     // Replace first match
-    fun replace(find: String, replace: String) {
+    fun replace(find: String, replace: String): Boolean {
         val text = textField.value.text
         val index = text.indexOf(find, ignoreCase = true)
         if (index >= 0) {
             val newText = text.replaceFirst(find, replace, ignoreCase = true)
             onTextChange(TextFieldValue(newText))
             commitChange()
+            return true
         }
+        return false
     }
 
     // Replace all matches
-    fun replaceAll(find: String, replace: String) {
+    fun replaceAll(find: String, replace: String): Boolean {
         val text = textField.value.text
         if (text.contains(find, ignoreCase = true)) {
             val newText = text.replace(find, replace, ignoreCase = true)
             onTextChange(TextFieldValue(newText))
             commitChange()
+            return true
         }
+        return false
     }
 }

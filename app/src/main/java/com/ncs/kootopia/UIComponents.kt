@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -83,6 +84,8 @@ fun MainEditorScaffold(
     onSaveClick: (String) -> Unit,
     onExecuteClick: () -> Unit,
     onRenameFile: (String) -> Unit,
+    onCopyClick: (() -> Unit) -> Unit,
+    onPasteClick: () -> Unit,
     content: @Composable (PaddingValues) -> Unit
 ) {
     var showSaveDialog by remember { mutableStateOf(false) }
@@ -93,125 +96,136 @@ fun MainEditorScaffold(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameInput by remember { mutableStateOf("") }
     var renameError by remember { mutableStateOf("") }
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Row {
-                        Text(text = "Kootopia", color = KootopiaColors.textPrimary)
-                        Text(
-                            text = if (currentFileName.isNotEmpty()) {
-                                if (currentFileName.length > 20) {
-                                    "${currentFileName.take(17)}..."
-                                } else {
-                                    " - $currentFileName"
-                                }
+    var showNoSelectionDialog by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Main TopAppBar
+        TopAppBar(
+            title = { 
+                Row {
+                    Text(text = "Kootopia", color = KootopiaColors.textPrimary)
+                    Text(
+                        text = if (currentFileName.isNotEmpty()) {
+                            if (currentFileName.length > 20) {
+                                "${currentFileName.take(17)}..."
                             } else {
-                                " - Untitled"
-                            },
-                            color = KootopiaColors.textSecondary,
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .clickable(
-                                    indication = null,
-                                    interactionSource = remember { MutableInteractionSource() }
-                                ) {
-                                    if (currentFileName.isNotEmpty()) {
-                                        renameInput = currentFileName
-                                        renameError = ""
-                                        showRenameDialog = true
-                                    }
-                                }
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Menu Bar",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                },
-                actions = {
-                    TextButton(
-                        onClick = { 
-                            if (currentFileName.isEmpty()) {
-                                showSaveDialog = true
-                                fileNameInput = ""
-                                fileNameError = ""
-                            } else {
-                                onSaveClick(currentFileName)
-                                savedFileName = currentFileName
-                                showSaveConfirmation = true
+                                " - $currentFileName"
                             }
+                        } else {
+                            " - Untitled"
                         },
-                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = KootopiaColors.accentBlue
-                        )
-                    ) {
-                        Text("Save")
-                    }
-                    TextButton(
-                        onClick = onExecuteClick,
-                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                            contentColor = KootopiaColors.accentBlue
-                        )
-                    ) {
-                        Text("Execute")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = KootopiaColors.surfaceDark
-                )
-            )
-        },
-        bottomBar = {
-            BottomAppBar(
-                actions = {
-                    IconButton(onClick = onEditClick) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Editing Option",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                    IconButton(onClick = onUndoClick) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.undo),
-                            contentDescription = "Undo",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                    IconButton(onClick = onRedoClick) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.redo),
-                            contentDescription = "Redo",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                    IconButton(onClick = onFindClick) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Find",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                    IconButton(onClick = onCompileClick) {
-                        Icon(
-                            imageVector = Icons.Default.AccountBox,
-                            contentDescription = "Compile",
-                            tint = KootopiaColors.textPrimary
-                        )
-                    }
-                },
+                        color = KootopiaColors.textSecondary,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() }
+                            ) {
+                                if (currentFileName.isNotEmpty()) {
+                                    renameInput = currentFileName
+                                    renameError = ""
+                                    showRenameDialog = true
+                                }
+                            }
+                    )
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = onMenuClick) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Menu Bar",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+            },
+            actions = {
+                TextButton(
+                    onClick = { 
+                        if (currentFileName.isEmpty()) {
+                            showSaveDialog = true
+                            fileNameInput = ""
+                            fileNameError = ""
+                        } else {
+                            onSaveClick(currentFileName)
+                            savedFileName = currentFileName
+                            showSaveConfirmation = true
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("Save")
+                }
+                TextButton(
+                    onClick = onExecuteClick,
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("Execute")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = KootopiaColors.surfaceDark
             )
+        )
+        
+        // Secondary Header - Toolbar
+        SecondaryHeader(
+            onUndoClick = onUndoClick,
+            onRedoClick = onRedoClick,
+            onCopyClick = { onCopyClick { showNoSelectionDialog = true } },
+            onPasteClick = onPasteClick,
+            onFindClick = onFindClick
+        )
+        
+        // Main content area
+        Box(modifier = Modifier.weight(1f)) {
+            content(PaddingValues(0.dp))
         }
-    ) { innerPadding ->
-        content(innerPadding)
+        
+        // Bottom App Bar
+        BottomAppBar(
+            actions = {
+                IconButton(onClick = onEditClick) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editing Option",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+                IconButton(onClick = onUndoClick) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.undo),
+                        contentDescription = "Undo",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+                IconButton(onClick = onRedoClick) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.redo),
+                        contentDescription = "Redo",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+                IconButton(onClick = onFindClick) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Find",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+                IconButton(onClick = onCompileClick) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBox,
+                        contentDescription = "Compile",
+                        tint = KootopiaColors.textPrimary
+                    )
+                }
+            },
+            containerColor = KootopiaColors.surfaceDark
+        )
     }
     
     // Save Dialog
@@ -403,6 +417,31 @@ fun MainEditorScaffold(
             containerColor = KootopiaColors.surfaceDark
         )
     }
+    
+    // No Selection Dialog
+    if (showNoSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoSelectionDialog = false },
+            title = { Text("No Text Selected", color = KootopiaColors.textPrimary) },
+            text = {
+                Text(
+                    "Please select some text to copy.",
+                    color = KootopiaColors.textPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showNoSelectionDialog = false },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = KootopiaColors.accentBlue
+                    )
+                ) {
+                    Text("OK", color = KootopiaColors.textPrimary)
+                }
+            },
+            containerColor = KootopiaColors.surfaceDark
+        )
+    }
 }
 
 /**
@@ -549,6 +588,73 @@ fun highlightSyntax(text: String, rules: SyntaxRules): AnnotatedString {
                 match.range.first,
                 match.range.last + 1
             )
+        }
+    }
+}
+
+/**
+ * Secondary Header - Toolbar with editing actions
+ */
+@Composable
+fun SecondaryHeader(
+    onUndoClick: () -> Unit,
+    onRedoClick: () -> Unit,
+    onCopyClick: () -> Unit,
+    onPasteClick: () -> Unit,
+    onFindClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(KootopiaColors.surfaceDark)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+    ) {
+        // Left side - Undo and Redo
+        Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = onUndoClick) {
+                Icon(
+                    painter = painterResource(id = R.drawable.undo),
+                    contentDescription = "Undo",
+                    tint = KootopiaColors.textPrimary
+                )
+            }
+            IconButton(onClick = onRedoClick) {
+                Icon(
+                    painter = painterResource(id = R.drawable.redo),
+                    contentDescription = "Redo",
+                    tint = KootopiaColors.textPrimary
+                )
+            }
+        }
+        
+        // Right side - Copy, Paste, and Replace
+        Row(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = onCopyClick) {
+                Icon(
+                    painter = painterResource(id = R.drawable.copy),
+                    contentDescription = "Copy",
+                    tint = KootopiaColors.textPrimary
+                )
+            }
+            IconButton(onClick = onPasteClick) {
+                Icon(
+                    painter = painterResource(id = R.drawable.paste),
+                    contentDescription = "Paste",
+                    tint = KootopiaColors.textPrimary
+                )
+            }
+            IconButton(onClick = onFindClick) {
+                Icon(
+                    painter = painterResource(id = R.drawable.replace),
+                    contentDescription = "Find and Replace",
+                    tint = KootopiaColors.textPrimary
+                )
+            }
         }
     }
 }
