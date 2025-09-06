@@ -58,8 +58,7 @@ fun DrawerContent(
     onSaveFile: (String) -> Unit,
     onToggleAutoSave: () -> Unit,
     onConfigure: () -> Unit = {},
-    onSourceCodeClick: () -> Unit = {},
-    onExtensionChange: (String) -> Unit = {}
+    onSourceCodeClick: () -> Unit = {}
 ) {
     var fileName = remember { mutableStateOf(initialFileName) }
     var showSaveDialog = remember { mutableStateOf(false) }
@@ -80,7 +79,7 @@ fun DrawerContent(
             .fillMaxHeight()
             .fillMaxWidth(0.6f)
             .background(com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark)
-            .padding(vertical = 16.dp, horizontal = 8.dp),
+            .padding(top = 32.dp, bottom = 16.dp, start = 8.dp, end = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.Start
     ) {
@@ -207,30 +206,6 @@ fun DrawerContent(
             )
         }
         
-        // Extension Change Option
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    onExtensionChange("")  // Empty string triggers dialog
-                }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = ImageVector.vectorResource(id = R.drawable.configure_icon),
-                contentDescription = "Change Extension",
-                tint = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Change Extension",
-                fontSize = 18.sp,
-                color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
-            )
-        }
-        
         Spacer(modifier = Modifier.height(16.dp))
         
         // Auto-save Toggle
@@ -352,6 +327,8 @@ fun DrawerContent(
                         val trimmedName = fileName.value.trim()
                         if (trimmedName.isEmpty()) {
                             fileNameError.value = "Please enter a file name"
+                        } else if (trimmedName.lowercase() == "untitled" || trimmedName.lowercase().startsWith("untitled.")) {
+                            fileNameError.value = "Cannot save file as 'Untitled'. Please choose a different name."
                         } else if (!trimmedName.contains(".")) {
                             fileNameError.value = "Please include a file extension (e.g., .txt, .py, .kt)"
                         } else {
@@ -360,12 +337,16 @@ fun DrawerContent(
                             } else {
                                 trimmedName + selectedExtension.value
                             }
-                            onSaveFile(finalName)
-                            savedFileName.value = finalName
-                            fileName.value = ""
-                            fileNameError.value = ""
-                            showSaveDialog.value = false
-                            showSaveConfirmation.value = true
+                            if (fileManager.fileExists(finalName, isConfigFile)) {
+                                fileNameError.value = "A file with this name already exists. Please choose a different name."
+                            } else {
+                                onSaveFile(finalName)
+                                savedFileName.value = finalName
+                                fileName.value = ""
+                                fileNameError.value = ""
+                                showSaveDialog.value = false
+                                showSaveConfirmation.value = true
+                            }
                         }
                     },
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(

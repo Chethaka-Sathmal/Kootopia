@@ -7,14 +7,15 @@ import java.io.File
 
 class FileManager(private val context: Context) {
 
-    // Get the Kootopia directory in Documents
+    // Get the Kootopia/src directory in Documents
     private fun getKootopiaDirectory(): File {
         val documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
         val kootopiaDir = File(documentsDir, "Kootopia")
-        if (!kootopiaDir.exists()) {
-            kootopiaDir.mkdirs()
+        val srcDir = File(kootopiaDir, "src")
+        if (!srcDir.exists()) {
+            srcDir.mkdirs()
         }
-        return kootopiaDir
+        return srcDir
     }
 
     // Create a new file (if not exists) and return its name
@@ -92,6 +93,15 @@ class FileManager(private val context: Context) {
             File(getConfigsDirectory(), fileName).absolutePath
         } else {
             File(getKootopiaDirectory(), fileName).absolutePath
+        }
+    }
+
+    // Check if a file exists in the appropriate directory
+    fun fileExists(fileName: String, isConfigFile: Boolean = false): Boolean {
+        return if (isConfigFile) {
+            File(getConfigsDirectory(), fileName).exists()
+        } else {
+            File(getKootopiaDirectory(), fileName).exists()
         }
     }
 

@@ -113,6 +113,10 @@ from typing import Dict, List, Tuple
 #
 # The Android app's supportedExtensions set should match these keys.
 #
+# EXECUTION MAPPING: Commands are automatically mapped based on file extension.
+# The detect_file_extension() function handles both filename-based and 
+# content-based detection for improved reliability.
+#
 COMPILERS: Dict[str, Dict[str, any]] = {
     '.kt': {
         'compile': lambda file_path: ['kotlinc', file_path, '-include-runtime', '-d', file_path.replace('.kt', '.jar')],
@@ -130,6 +134,76 @@ COMPILERS: Dict[str, Dict[str, any]] = {
         'description': 'Python syntax checker and executor'
     }
 }
+
+def detect_file_extension(filename: str, code_content: str) -> str:
+    """
+    Detect file extension from filename or code content.
+    
+    Args:
+        filename: The filename provided by the client
+        code_content: The code content to analyze
+    
+    Returns:
+        Detected file extension (e.g., '.kt', '.java', '.py')
+    """
+    print(f"🔍 DEBUG: detect_file_extension called with filename='{filename}', code_length={len(code_content)}")
+    print(f"🔍 DEBUG: Code preview: '{code_content[:50]}{'...' if len(code_content) > 50 else ''}'")
+    
+    # First try to get extension from filename
+    _, extension = os.path.splitext(filename)
+    extension = extension.lower()
+    print(f"🔍 DEBUG: Extracted extension from filename: '{extension}'")
+    print(f"🔍 DEBUG: Available extensions: {list(COMPILERS.keys())}")
+    
+    # Always analyze content first to detect language mismatches
+    code_lower = code_content.lower().strip()
+    print(f"🔍 DEBUG: Code content (lowercase): '{code_lower}'")
+    
+    # Python detection - more comprehensive
+    python_indicators = [
+        code_lower.startswith('print('),
+        'def ' in code_lower,
+        'import ' in code_lower,
+        code_lower.startswith('#'),
+        'python' in code_lower,
+        code_lower.startswith('from '),
+        '=' in code_lower and 'print(' in code_lower  # Simple assignment with print
+    ]
+    
+    print(f"🔍 DEBUG: Python indicators: {python_indicators}")
+    
+    if any(python_indicators):
+        if extension == '.py':
+            print(f"🔍 EXTENSION DETECTED: .py (filename and content match)")
+        else:
+            print(f"🔍 EXTENSION DETECTED from content: .py (Python) - overriding filename extension '{extension}'")
+        return '.py'
+    
+    # Java detection  
+    java_indicators = [
+        'public class' in code_lower,
+        'public static void main' in code_lower,
+        code_lower.startswith('import java'),
+        'system.out.println' in code_lower
+    ]
+    
+    print(f"🔍 DEBUG: Java indicators: {java_indicators}")
+    
+    if any(java_indicators):
+        if extension == '.java':
+            print(f"🔍 EXTENSION DETECTED: .java (filename and content match)")
+        else:
+            print(f"🔍 EXTENSION DETECTED from content: .java (Java) - overriding filename extension '{extension}'")
+        return '.java'
+    
+    # If we have a valid extension from filename and no content override, use it
+    if extension and extension in COMPILERS:
+        print(f"🔍 EXTENSION DETECTED from filename: {extension} (no content override)")
+        return extension
+    
+    # Kotlin detection (default if nothing else matches)
+    print(f"🔍 EXTENSION DETECTED: .kt (Kotlin - default)")
+    return '.kt'
 
 def run_command(command: List[str], step_name: str, timeout: int = 30) -> Tuple[bool, str]:
     """
@@ -200,10 +274,12 @@ def handle_compilation(file_path: str, extension: str) -> str:
         Combined compilation and execution result message
     """
     if extension not in COMPILERS:
-        return f"Unsupported file type: {extension}. Please configure the script."
+        supported_types = ', '.join(COMPILERS.keys())
+        return f"Unsupported file type: {extension}. Supported types: {supported_types}"
     
     print(f"📁 FILE PATH: {file_path}")
     print(f"📄 FILE EXTENSION: {extension}")
+    print(f"🔧 USING COMPILER: {COMPILERS[extension]['description']}")
     print("=" * 50)
     
     compiler_config = COMPILERS[extension]
@@ -339,15 +415,10 @@ def handle_client_connection(client_socket: socket.socket, client_address: Tuple
         
         print("🔧 DEBUG: Starting file processing...")
         
-        # Extract file extension
-        _, extension = os.path.splitext(filename)
-        print(f"🔧 DEBUG: Extracted extension: '{extension}' from filename: '{filename}'")
-        
-        if not extension:
-            extension = '.kt'  # Default to Kotlin if no extension
-            print(f"🔧 DEBUG: No extension found, defaulting to: '{extension}'")
-            
+        # Detect file extension from filename and/or code content
+        extension = detect_file_extension(filename, code)
         print(f"🔧 FILE EXTENSION: {extension}")
+        print(f"🔧 COMPILER CONFIG: {COMPILERS[extension]['description']}")
         
         # Create temporary file with proper extension
         print("💾 DEBUG: Creating temporary file...")

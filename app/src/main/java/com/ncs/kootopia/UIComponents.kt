@@ -106,33 +106,28 @@ fun MainEditorScaffold(
         // Main TopAppBar
         TopAppBar(
             title = { 
-                Row {
-                    Text(text = "Kootopia", color = KootopiaColors.textPrimary)
-                    Text(
-                        text = if (currentFileName.isNotEmpty()) {
-                            if (currentFileName.length > 20) {
-                                "${currentFileName.take(17)}..."
-                            } else {
-                                " - $currentFileName"
-                            }
+                Text(
+                    text = if (currentFileName.isNotEmpty()) {
+                        if (currentFileName.length > 25) {
+                            "${currentFileName.take(22)}..."
                         } else {
-                            " - Untitled"
-                        },
-                        color = KootopiaColors.textSecondary,
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() }
-                            ) {
-                                if (currentFileName.isNotEmpty()) {
-                                    renameInput = currentFileName
-                                    renameError = ""
-                                    showRenameDialog = true
-                                }
-                            }
-                    )
-                }
+                            currentFileName
+                        }
+                    } else {
+                        "Untitled"
+                    },
+                    color = KootopiaColors.textPrimary,
+                    modifier = Modifier.clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        if (currentFileName.isNotEmpty()) {
+                            renameInput = currentFileName
+                            renameError = ""
+                            showRenameDialog = true
+                        }
+                    }
+                )
             },
             navigationIcon = {
                 IconButton(onClick = onMenuClick) {
@@ -146,7 +141,7 @@ fun MainEditorScaffold(
             actions = {
                 TextButton(
                     onClick = { 
-                        if (currentFileName.isEmpty()) {
+                        if (currentFileName.isEmpty() || currentFileName == "Untitled") {
                             showSaveDialog = true
                             fileNameInput = ""
                             fileNameError = ""
@@ -158,17 +153,25 @@ fun MainEditorScaffold(
                     },
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
                         contentColor = KootopiaColors.accentBlue
-                    )
+                    ),
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 ) {
-                    Text("Save")
+                    Text(
+                        text = "Save",
+                        style = TextStyle(fontSize = 16.sp)
+                    )
                 }
                 TextButton(
                     onClick = onExecuteClick,
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
                         contentColor = KootopiaColors.accentBlue
-                    )
+                    ),
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 ) {
-                    Text("Execute")
+                    Text(
+                        text = "Execute",
+                        style = TextStyle(fontSize = 16.sp)
+                    )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -240,8 +243,12 @@ fun MainEditorScaffold(
                         val fileName = fileNameInput.trim()
                         if (fileName.isEmpty()) {
                             fileNameError = "Please enter a file name"
+                        } else if (fileName.lowercase() == "untitled" || fileName.lowercase().startsWith("untitled.")) {
+                            fileNameError = "Cannot save file as 'Untitled'. Please choose a different name."
                         } else if (!fileName.contains(".")) {
                             fileNameError = "Please include a file extension (e.g., .txt, .py, .kt)"
+                        } else if (fileManager.fileExists(fileName, isConfigFile)) {
+                            fileNameError = "A file with this name already exists. Please choose a different name."
                         } else {
                             onSaveClick(fileName)
                             savedFileName = fileName
@@ -357,6 +364,8 @@ fun MainEditorScaffold(
                         val newName = renameInput.trim()
                         if (newName.isEmpty()) {
                             renameError = "Please enter a file name"
+                        } else if (newName.lowercase() == "untitled" || newName.lowercase().startsWith("untitled.")) {
+                            renameError = "Cannot save file as 'Untitled'. Please choose a different name."
                         } else if (!newName.contains(".")) {
                             renameError = "Please include a file extension (e.g., .txt, .py, .kt)"
                         } else if (newName.contains("/") || newName.contains("\\") || newName.contains(":") || 
@@ -365,6 +374,8 @@ fun MainEditorScaffold(
                             renameError = "File name contains invalid characters. Avoid: / \\ : * ? \" < > |"
                         } else if (newName.length > 255) {
                             renameError = "File name is too long (maximum 255 characters)"
+                        } else if (fileManager.fileExists(newName, isConfigFile)) {
+                            renameError = "A file with this name already exists. Please choose a different name."
                         } else {
                             onRenameFile(newName)
                             showRenameDialog = false
@@ -595,14 +606,16 @@ fun SecondaryHeader(
                 Icon(
                     painter = painterResource(id = R.drawable.undo),
                     contentDescription = "Undo",
-                    tint = KootopiaColors.textPrimary
+                    tint = KootopiaColors.textPrimary,
+                    modifier = Modifier.padding(4.dp)
                 )
             }
             IconButton(onClick = onRedoClick) {
                 Icon(
                     painter = painterResource(id = R.drawable.redo),
                     contentDescription = "Redo",
-                    tint = KootopiaColors.textPrimary
+                    tint = KootopiaColors.textPrimary,
+                    modifier = Modifier.padding(4.dp)
                 )
             }
         }
@@ -615,21 +628,24 @@ fun SecondaryHeader(
                 Icon(
                     painter = painterResource(id = R.drawable.copy),
                     contentDescription = "Copy",
-                    tint = KootopiaColors.textPrimary
+                    tint = KootopiaColors.textPrimary,
+                    modifier = Modifier.padding(4.dp)
                 )
             }
             IconButton(onClick = onPasteClick) {
                 Icon(
                     painter = painterResource(id = R.drawable.paste),
                     contentDescription = "Paste",
-                    tint = KootopiaColors.textPrimary
+                    tint = KootopiaColors.textPrimary,
+                    modifier = Modifier.padding(4.dp)
                 )
             }
             IconButton(onClick = onFindClick) {
                 Icon(
                     painter = painterResource(id = R.drawable.replace),
                     contentDescription = "Find and Replace",
-                    tint = KootopiaColors.textPrimary
+                    tint = KootopiaColors.textPrimary,
+                    modifier = Modifier.padding(4.dp)
                 )
             }
         }

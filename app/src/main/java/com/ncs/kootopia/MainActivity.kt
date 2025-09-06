@@ -3,6 +3,7 @@ package com.ncs.kootopia
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import android.util.Log
 import android.view.WindowManager
 import java.io.File
@@ -116,12 +117,14 @@ class MainActivity : ComponentActivity() {
     private var lastSourceFileName by mutableStateOf("Untitled")
     private var lastSourceContent by mutableStateOf("")
     
-    // File picker launcher
+    // File picker launcher with default directory
     private val filePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { selectedUri ->
-            openFileFromUri(selectedUri)
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            result.data?.data?.let { uri ->
+                openFileFromUri(uri)
+            }
         }
     }
 
@@ -146,7 +149,6 @@ class MainActivity : ComponentActivity() {
             var showFindReplace by remember { mutableStateOf(false) }
             var showCompilerInterface by remember { mutableStateOf(false) }
             var showConfigurationDialog by remember { mutableStateOf(false) }
-            var showExtensionDialog by remember { mutableStateOf(false) }
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             var compileOutput by remember { mutableStateOf("") }
             var showCompilationDrawer by remember { mutableStateOf(false) }
@@ -184,23 +186,21 @@ class MainActivity : ComponentActivity() {
                             isConfigFile = isEditingConfig,
                             hasUnsavedChanges = hasUnsavedChanges,
                             autoSaveEnabled = autoSaveEnabled,
-                            onNewFile = { createNewFile(it) },
-                            onNewUntitledFile = { createNewUntitledFile() },
+                            onNewFile = { 
+                                createNewFile(it)
+                                scope.launch { drawerState.close() }
+                            },
+                            onNewUntitledFile = { 
+                                createNewUntitledFile()
+                                scope.launch { drawerState.close() }
+                            },
                             onOpenFile = { launchFilePicker() },
                             onSaveFile = { saveFile(it) },
                             onToggleAutoSave = { autoSaveEnabled = !autoSaveEnabled },
                             onConfigure = { 
                                 showConfigurationDialog = true
                             },
-                            onSourceCodeClick = { switchToSourceCode() },
-                            onExtensionChange = { newExtension ->
-                                if (newExtension.isEmpty()) {
-                                    // Empty string triggers dialog
-                                    showExtensionDialog = true
-                                } else {
-                                    changeFileExtension(newExtension)
-                                }
-                            }
+                            onSourceCodeClick = { switchToSourceCode() }
                         )
                     }
                 ) {
@@ -305,18 +305,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 
-                // Extension Change Dialog
-                if (showExtensionDialog) {
-                    ExtensionChangeDialog(
-                        currentExtension = currentExtension,
-                        supportedExtensions = supportedExtensions,
-                        onExtensionSelected = { newExtension ->
-                            changeFileExtension(newExtension)
-                            showExtensionDialog = false
-                        },
-                        onDismiss = { showExtensionDialog = false }
-                    )
-                }
             }
         }
     }
@@ -363,9 +351,25 @@ class MainActivity : ComponentActivity() {
         hasUnsavedChanges = false
     }
 
-    // Launch system file picker
+    // Launch system file picker with default location
     private fun launchFilePicker() {
-        filePickerLauncher.launch("*/*")
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            
+            // Try to set default directory to Documents folder
+            try {
+                // Create URI for Documents folder - this should open to Documents by default
+                val documentsUri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments")
+                putExtra(DocumentsContract.EXTRA_INITIAL_URI, documentsUri)
+                Log.d("MainActivity", "Set initial URI to Documents folder: $documentsUri")
+            } catch (e: Exception) {
+                Log.w("MainActivity", "Could not set initial directory: ${e.message}")
+                // Fallback: try without initial URI
+            }
+        }
+        
+        filePickerLauncher.launch(intent)
     }
 
     // Open file from URI (from system file picker)
@@ -542,66 +546,4 @@ class MainActivity : ComponentActivity() {
 
 }
 
-/**
- * Extension Change Dialog
- * ======================
- * 
- * Allows users to change the current file extension, which triggers:
- * 1. Immediate syntax highlighting update
- * 2. Compile button enable/disable based on support
- * 3. Filename update (if not "Untitled")
- * 
- * TESTING:
- * ========
- * - Open drawer menu → "Change Extension"
- * - Dialog should show: .kt, .java, .py options
- * - Current extension should be highlighted/marked
- * - Selecting new extension should update syntax highlighting immediately
- */
-@Composable
-fun ExtensionChangeDialog(
-    currentExtension: String,
-    supportedExtensions: Set<String>,
-    onExtensionSelected: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Change File Extension") },
-        text = {
-            Column {
-                Text("Select a file extension:")
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                supportedExtensions.forEach { extension ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onExtensionSelected(extension) }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = extension,
-                            modifier = Modifier.weight(1f),
-                            style = if (extension == currentExtension) {
-                                TextStyle(fontWeight = FontWeight.Bold)
-                            } else {
-                                TextStyle()
-                            }
-                        )
-                        if (extension == currentExtension) {
-                            Text("(current)", style = TextStyle(fontSize = 12.sp))
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
 
