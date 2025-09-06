@@ -1,11 +1,14 @@
 package com.ncs.kootopia
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -37,10 +40,22 @@ class MainActivity : ComponentActivity() {
     private val editorState = TextEditorState()
     private var hasUnsavedChanges by mutableStateOf(false)
     private var autoSaveEnabled by mutableStateOf(true)
+    private var isEditingConfig by mutableStateOf(false)
+    
+    // File picker launcher
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            openFileFromUri(selectedUri)
+        }
+    }
 
     override fun onPause() {
         super.onPause()
-        saveFile(currentFileName)
+        if (currentFileName.isNotEmpty() && currentFileName != "Untitled") {
+            saveFile(currentFileName)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,10 +67,11 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             val clipboardManager = LocalClipboardManager.current
-            val syntaxRules = loadSyntaxRules(this, "python.json")
+            val syntaxRules = loadSyntaxRules(this, "kotlin.json")
             var showMiniToolbar by remember { mutableStateOf(false) }
             var showFindReplace by remember { mutableStateOf(false) }
             var showCompilerInterface by remember { mutableStateOf(false) }
+            var showConfigurationDialog by remember { mutableStateOf(false) }
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             var compileOutput by remember { mutableStateOf("") }
             val scope = rememberCoroutineScope()
@@ -64,7 +80,6 @@ class MainActivity : ComponentActivity() {
             // Track unsaved changes in real-time
             LaunchedEffect(editorState.textField.value) {
                 hasUnsavedChanges = editorState.hasUnsavedChanges()
-                Log.d("MainActivity", "hasUnsavedChanges updated: $hasUnsavedChanges")
             }
 
             // Auto-save and commit changes (but don't update hasUnsavedChanges here)
@@ -74,12 +89,9 @@ class MainActivity : ComponentActivity() {
                     snapshotFlow { editorState.textField.value }
                         .debounce(2000) // 2 seconds
                         .collect {
-                            Log.d("MainActivity", "Auto-saving...")
                             editorState.commitChange()
                             saveFile(currentFileName)
                         }
-                } else {
-                    Log.d("MainActivity", "Auto-save disabled")
                 }
             }
 
@@ -95,12 +107,11 @@ class MainActivity : ComponentActivity() {
                             autoSaveEnabled = autoSaveEnabled,
                             onNewFile = { createNewFile(it) },
                             onNewUntitledFile = { createNewUntitledFile() },
-                            onOpenFile = { openFile(it) },
+                            onOpenFile = { launchFilePicker() },
                             onSaveFile = { saveFile(it) },
                             onToggleAutoSave = { autoSaveEnabled = !autoSaveEnabled },
                             onConfigure = { 
-                                // TODO: Implement configure functionality
-                                // This could open settings, preferences, or configuration dialog
+                                showConfigurationDialog = true
                             }
                         )
                     }
@@ -182,6 +193,20 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                
+                // Configuration Dialog
+                if (showConfigurationDialog) {
+                    ConfigurationDialog(
+                        fileManager = fileManager,
+                        onDismiss = { showConfigurationDialog = false },
+                        onEditConfig = { configFileName ->
+                            openConfigFile(configFileName)
+                        },
+                        onCreateConfig = { configFileName ->
+                            createNewConfigFile(configFileName)
+                        }
+                    )
+                }
             }
         }
     }
@@ -190,6 +215,7 @@ class MainActivity : ComponentActivity() {
     private fun createNewFile(filename: String) {
         val file = fileManager.createNewFile(filename)
         currentFileName = file
+        isEditingConfig = false
         editorState.textField.value = TextFieldValue("")
         editorState.forceCommit()
         hasUnsavedChanges = false
@@ -198,6 +224,7 @@ class MainActivity : ComponentActivity() {
     // Create a new untitled file
     private fun createNewUntitledFile() {
         currentFileName = "Untitled"
+        isEditingConfig = false
         editorState.textField.value = TextFieldValue("")
         editorState.forceCommit()
         hasUnsavedChanges = false
@@ -205,7 +232,11 @@ class MainActivity : ComponentActivity() {
 
     // Save current editor content to a file (This function takes lambda callbacks for New, Open, and Save actions in DrawerContent)
     private fun saveFile(filename: String ) {
-        fileManager.saveFile(filename, editorState.textField.value.text)
+        if (isEditingConfig) {
+            fileManager.saveConfiguration(filename, editorState.textField.value.text)
+        } else {
+            fileManager.saveFile(filename, editorState.textField.value.text)
+        }
         editorState.forceCommit()
         hasUnsavedChanges = false
     }
@@ -215,6 +246,75 @@ class MainActivity : ComponentActivity() {
         val content = fileManager.openFile(filename)
         editorState.textField.value = TextFieldValue(content)
         currentFileName = filename
+        isEditingConfig = false
+        editorState.forceCommit()
+        hasUnsavedChanges = false
+    }
+
+    // Launch system file picker
+    private fun launchFilePicker() {
+        filePickerLauncher.launch("*/*")
+    }
+
+    // Open file from URI (from system file picker)
+    private fun openFileFromUri(uri: Uri) {
+        try {
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                val content = inputStream.bufferedReader().use { it.readText() }
+                editorState.textField.value = TextFieldValue(content)
+                
+                // Extract filename from URI
+                val fileName = getFileNameFromUri(uri) ?: "Unknown"
+                currentFileName = fileName
+                isEditingConfig = false
+                editorState.forceCommit()
+                hasUnsavedChanges = false
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error opening file from URI: ${e.message}")
+        }
+    }
+
+    // Extract filename from URI
+    private fun getFileNameFromUri(uri: Uri): String? {
+        return when (uri.scheme) {
+            "content" -> {
+                contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (cursor.moveToFirst() && nameIndex >= 0) {
+                        cursor.getString(nameIndex)
+                    } else null
+                }
+            }
+            "file" -> uri.lastPathSegment
+            else -> uri.lastPathSegment
+        }
+    }
+
+    // Open an existing configuration file for editing
+    private fun openConfigFile(configFileName: String) {
+        val content = fileManager.loadConfiguration(configFileName)
+        editorState.textField.value = TextFieldValue(content)
+        currentFileName = configFileName
+        isEditingConfig = true
+        editorState.forceCommit()
+        hasUnsavedChanges = false
+    }
+
+    // Create a new configuration file
+    private fun createNewConfigFile(configFileName: String) {
+        // Create a template configuration file
+        val templateContent = """
+{
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "comments": ["//", "/*", "*/"],
+  "strings": ["\"", "'"]
+}
+        """.trimIndent()
+        
+        editorState.textField.value = TextFieldValue(templateContent)
+        currentFileName = configFileName
+        isEditingConfig = true
         editorState.forceCommit()
         hasUnsavedChanges = false
     }

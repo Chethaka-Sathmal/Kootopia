@@ -2,7 +2,6 @@ package com.ncs.kootopia
 
 import android.R.attr.text
 import android.content.Context
-import android.util.Log
 import com.ncs.kootopia.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
@@ -52,14 +50,13 @@ fun DrawerContent(
     autoSaveEnabled: Boolean,
     onNewFile: (String) -> Unit,
     onNewUntitledFile: () -> Unit,
-    onOpenFile: (String) -> Unit,
+    onOpenFile: () -> Unit,
     onSaveFile: (String) -> Unit,
     onToggleAutoSave: () -> Unit,
     onConfigure: () -> Unit = {}
 ) {
     var fileName = remember { mutableStateOf(initialFileName) }
     var showSaveDialog = remember { mutableStateOf(false) }
-    var showOpenDialog = remember { mutableStateOf(false) }
     var fileNameError = remember { mutableStateOf("") }
     var expanded = remember { mutableStateOf(false) }
     var showSaveConfirmation = remember { mutableStateOf(false) }
@@ -94,12 +91,9 @@ fun DrawerContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { 
-                    Log.d("DrawerContent", "New File clicked! hasUnsavedChanges: $hasUnsavedChanges")
                     if (hasUnsavedChanges) {
-                        Log.d("DrawerContent", "Showing unsaved changes dialog")
                         showUnsavedChangesDialog.value = true
                     } else {
-                        Log.d("DrawerContent", "Creating new untitled file directly")
                         onNewUntitledFile()
                     }
                 }
@@ -124,7 +118,7 @@ fun DrawerContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { showOpenDialog.value = true }
+                .clickable { onOpenFile() }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -194,10 +188,7 @@ fun DrawerContent(
             }
             Switch(
                 checked = autoSaveEnabled,
-                onCheckedChange = { 
-                    Log.d("DrawerContent", "Auto-save toggled: ${!autoSaveEnabled}")
-                    onToggleAutoSave() 
-                },
+                onCheckedChange = { onToggleAutoSave() },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue,
                     checkedTrackColor = com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue.copy(alpha = 0.5f),
@@ -327,68 +318,6 @@ fun DrawerContent(
             containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
         )
     }
-    // Show "Open File" dialog
-    if (showOpenDialog.value) {
-        val files = context.filesDir.listFiles()?.toList()?.filter { it.isFile } ?: emptyList()
-        AlertDialog(
-            onDismissRequest = { showOpenDialog.value = false },
-            title = { 
-                Text(
-                    "Open File", 
-                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
-                ) 
-            },
-            text = {
-                if (files.isEmpty()) {
-                    Text(
-                        "No files found in the project directory.",
-                        color = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.height(300.dp)) {
-                        items(files.size) { index ->
-                            val file = files[index]
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onOpenFile(file.name)
-                                        showOpenDialog.value = false
-                                    }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = ImageVector.vectorResource(id = R.drawable.open_arrow),
-                                    contentDescription = "Open File",
-                                    tint = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = file.name,
-                                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
-                                    fontSize = 16.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { showOpenDialog.value = false },
-                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                        contentColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
-                    )
-                ) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
-        )
-    }
     
     // Save Confirmation Dialog
     if (showSaveConfirmation.value) {
@@ -462,4 +391,5 @@ fun DrawerContent(
             containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
         )
     }
+
 }

@@ -1,0 +1,6 @@
+{
+  "keywords": ["package", "import", "class", "interface", "enum", "object", "companion", "data", "sealed", "abstract", "open", "final", "override", "private", "protected", "public", "internal", "fun", "val", "var", "const", "lateinit", "lazy", "delegate", "by", "if", "else", "when", "for", "while", "do", "break", "continue", "return", "throw", "try", "catch", "finally", "null", "true", "false", "this", "super", "is", "!is", "as", "as?", "in", "!in", "typealias", "suspend", "inline", "noinline", "crossinline", "reified", "external", "annotation", "vararg", "tailrec", "operator", "infix", "expect", "actual"],
+  "comments": ["//", "/*", "*/"],
+  "strings": ["\"", "'", "\"\"\""]
+}
+
