@@ -5,14 +5,24 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
+import java.io.File
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DrawerValue
+import androidx.compose.runtime.Composable
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
@@ -22,21 +32,83 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ncs.kootopia.ui.theme.KootopiaTheme
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.FlowPreview
 
 
-// MainActivity: Hosts the code editor UI and handles file operations
+/**
+ * MainActivity: Hosts the code editor UI and handles file operations
+ * 
+ * COMPILATION TESTING GUIDE:
+ * =========================
+ * 
+ * SETUP REQUIREMENTS:
+ * 1. Desktop: Install kotlinc, javac, python3
+ * 2. Desktop: Run 'python3 server.py' (keep running)
+ * 3. Desktop: Run 'adb reverse tcp:8080 tcp:8080'
+ * 4. Android: Connect device via USB with debugging enabled
+ * 
+ * TEST CASES:
+ * ===========
+ * 
+ * 1. KOTLIN COMPILATION (.kt):
+ *    - Change extension to .kt (should be default)
+ *    - Enter test code:
+ *      fun main() {
+ *          println("Hello from Kotlin!")
+ *      }
+ *    - Press compile → Should show "Compilation successful!"
+ * 
+ * 2. JAVA COMPILATION (.java):
+ *    - Change extension to .java via drawer menu
+ *    - Enter test code:
+ *      public class HelloWorld {
+ *          public static void main(String[] args) {
+ *              System.out.println("Hello from Java!");
+ *          }
+ *      }
+ *    - Press compile → Should show "Compilation successful!"
+ * 
+ * 3. PYTHON COMPILATION (.py):
+ *    - Change extension to .py via drawer menu
+ *    - Enter test code:
+ *      print("Hello from Python!")
+ *    - Press compile → Should show "Compilation successful!"
+ * 
+ * 4. ERROR TESTING:
+ *    - Try invalid syntax (missing quotes, semicolons)
+ *    - Should show red error message and highlight error lines
+ * 
+ * 5. UNSUPPORTED EXTENSION:
+ *    - Try .txt, .cpp, or other unsupported extensions
+ *    - Compile button should be disabled
+ *    - If somehow triggered, should show "Unsupported file type" message
+ * 
+ * FEATURES TO VERIFY:
+ * - Extension change updates syntax highlighting immediately
+ * - Compile button enabled/disabled based on extension
+ * - Error lines highlighted in red background
+ * - Success/failure messages color-coded (green/red)
+ */
 @OptIn(FlowPreview::class)
 class MainActivity : ComponentActivity() {
+    // Supported extensions for compilation (matching Python server COMPILERS dict)
+    private val supportedExtensions = setOf(".kt", ".java", ".py")
+    
     private lateinit var fileManager: FileManager
     private var currentFileName by mutableStateOf("Untitled")
+    private var currentExtension by mutableStateOf(".kt") // Default extension
     private val editorState = TextEditorState()
     private var hasUnsavedChanges by mutableStateOf(false)
     private var autoSaveEnabled by mutableStateOf(true)
@@ -69,13 +141,16 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             val clipboardManager = LocalClipboardManager.current
-            val syntaxRules = loadSyntaxRules(this, "kotlin.json")
+            val syntaxRules = loadSyntaxRules(this, getConfigFileForExtension(currentExtension))
             var showMiniToolbar by remember { mutableStateOf(false) }
             var showFindReplace by remember { mutableStateOf(false) }
             var showCompilerInterface by remember { mutableStateOf(false) }
             var showConfigurationDialog by remember { mutableStateOf(false) }
+            var showExtensionDialog by remember { mutableStateOf(false) }
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             var compileOutput by remember { mutableStateOf("") }
+            var showCompilationDrawer by remember { mutableStateOf(false) }
+            var isCompiling by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             val context = LocalContext.current
 
@@ -117,7 +192,15 @@ class MainActivity : ComponentActivity() {
                             onConfigure = { 
                                 showConfigurationDialog = true
                             },
-                            onSourceCodeClick = { switchToSourceCode() }
+                            onSourceCodeClick = { switchToSourceCode() },
+                            onExtensionChange = { newExtension ->
+                                if (newExtension.isEmpty()) {
+                                    // Empty string triggers dialog
+                                    showExtensionDialog = true
+                                } else {
+                                    changeFileExtension(newExtension)
+                                }
+                            }
                         )
                     }
                 ) {
@@ -134,9 +217,11 @@ class MainActivity : ComponentActivity() {
                             onRedoClick = { editorState.redo() },
                             onFindClick = { showFindReplace = !showFindReplace },
                             onCompileClick = {
-                                compileCode(context, editorState.textField.value.text, fileManager, currentFileName) { output ->
-                                    compileOutput = output
-                                    showCompilerInterface = true
+                                if (isCompilationSupported()) {
+                                    compileCode(context, editorState.textField.value.text, fileManager, getCurrentFileNameWithExtension(), editorState) { output ->
+                                        compileOutput = output
+                                        showCompilerInterface = true
+                                    }
                                 }
                             },
                             onSaveClick = { fileName ->
@@ -144,9 +229,13 @@ class MainActivity : ComponentActivity() {
                                 currentFileName = fileName
                             },
                             onExecuteClick = {
-                                compileCode(context, editorState.textField.value.text, fileManager, currentFileName) { output ->
-                                    compileOutput = output
-                                    showCompilerInterface = true
+                                if (isCompilationSupported()) {
+                                    isCompiling = true
+                                    showCompilationDrawer = true
+                                    compileCode(context, editorState.textField.value.text, fileManager, getCurrentFileNameWithExtension(), editorState) { output ->
+                                        compileOutput = output
+                                        isCompiling = false
+                                    }
                                 }
                             },
                             onRenameFile = { newFileName ->
@@ -168,13 +257,20 @@ class MainActivity : ComponentActivity() {
                             onPasteClick = { pasteText(editorState.textField.value, { editorState.onTextChange(it) }, clipboardManager) }
                         ) { innerPadding ->
                             Column(modifier = Modifier.padding(innerPadding)) {
-                                if (showCompilerInterface) {
-                                    CompilerInterface(
-                                        clipboardManager, 
-                                        compileOutput, 
-                                        onClose = { showCompilerInterface = false }
-                                    )
-                                }
+                                // Code Editor
+                                CodeEditor(
+                                    modifier = Modifier.weight(1f),
+                                    editorState = editorState,
+                                    syntaxRules = syntaxRules
+                                )
+                                
+                                // Compilation Result Panel (Bottom Split)
+                                CompilationResultPanel(
+                                    isVisible = showCompilationDrawer,
+                                    isCompiling = isCompiling,
+                                    result = compileOutput,
+                                    onDismiss = { showCompilationDrawer = false }
+                                )
 
                                 if (showFindReplace) {
                                     FindReplaceBar(
@@ -190,12 +286,6 @@ class MainActivity : ComponentActivity() {
                                         onPaste = { pasteText(editorState.textField.value, { editorState.onTextChange(it) }, clipboardManager) }
                                     )
                                 }
-
-                                CodeEditor(
-                                    modifier = Modifier.weight(1f),
-                                    editorState = editorState,
-                                    syntaxRules = syntaxRules
-                                )
                             }
                         }
                     }
@@ -214,6 +304,19 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                
+                // Extension Change Dialog
+                if (showExtensionDialog) {
+                    ExtensionChangeDialog(
+                        currentExtension = currentExtension,
+                        supportedExtensions = supportedExtensions,
+                        onExtensionSelected = { newExtension ->
+                            changeFileExtension(newExtension)
+                            showExtensionDialog = false
+                        },
+                        onDismiss = { showExtensionDialog = false }
+                    )
+                }
             }
         }
     }
@@ -222,6 +325,7 @@ class MainActivity : ComponentActivity() {
     private fun createNewFile(filename: String) {
         val file = fileManager.createNewFile(filename)
         currentFileName = file
+        updateExtensionFromFileName(filename)
         isEditingConfig = false
         editorState.textField.value = TextFieldValue("")
         editorState.forceCommit()
@@ -253,6 +357,7 @@ class MainActivity : ComponentActivity() {
         val content = fileManager.openFile(filename)
         editorState.textField.value = TextFieldValue(content)
         currentFileName = filename
+        updateExtensionFromFileName(filename)
         isEditingConfig = false
         editorState.forceCommit()
         hasUnsavedChanges = false
@@ -273,6 +378,7 @@ class MainActivity : ComponentActivity() {
                 // Extract filename from URI
                 val fileName = getFileNameFromUri(uri) ?: "Unknown"
                 currentFileName = fileName
+                updateExtensionFromFileName(fileName)
                 isEditingConfig = false
                 editorState.forceCommit()
                 hasUnsavedChanges = false
@@ -354,7 +460,148 @@ class MainActivity : ComponentActivity() {
             hasUnsavedChanges = false
         }
     }
+    
+    // ==========================================
+    // EXTENSION MANAGEMENT HELPER FUNCTIONS
+    // ==========================================
+    
+    /**
+     * Get the current filename with proper extension for sending to server.
+     * Examples: "untitled.kt", "MainActivity.java", "script.py"
+     */
+    private fun getCurrentFileNameWithExtension(): String {
+        val result = if (currentFileName == "Untitled") {
+            "untitled$currentExtension"  // e.g., "untitled.kt"
+        } else {
+            val nameWithoutExt = File(currentFileName).nameWithoutExtension
+            "$nameWithoutExt$currentExtension"  // e.g., "MainActivity.java"
+        }
+        
+        // DEBUG: Log the filename generation
+        Log.d("MainActivity", "DEBUG: getCurrentFileNameWithExtension()")
+        Log.d("MainActivity", "DEBUG: currentFileName = '$currentFileName'")
+        Log.d("MainActivity", "DEBUG: currentExtension = '$currentExtension'")
+        Log.d("MainActivity", "DEBUG: result = '$result'")
+        
+        return result
+    }
+    
+    /**
+     * Map file extensions to their corresponding syntax highlighting config files.
+     * This enables automatic syntax highlighting when extension changes.
+     */
+    private fun getConfigFileForExtension(extension: String): String {
+        return when (extension) {
+            ".kt" -> "kotlin.json"      // Kotlin syntax highlighting
+            ".java" -> "java.json"      // Java syntax highlighting  
+            ".py" -> "python.json"      // Python syntax highlighting
+            else -> "fallback.json"     // No highlighting for unsupported types
+        }
+    }
+    
+    /**
+     * Check if the current file extension supports compilation.
+     * Used to enable/disable compile button dynamically.
+     */
+    private fun isCompilationSupported(): Boolean {
+        return supportedExtensions.contains(currentExtension)
+    }
+    
+    /**
+     * Change the current file extension and update filename if needed.
+     * Triggers syntax highlighting refresh automatically via compose recomposition.
+     */
+    private fun changeFileExtension(newExtension: String) {
+        Log.d("MainActivity", "DEBUG: changeFileExtension called")
+        Log.d("MainActivity", "DEBUG: old currentExtension = '$currentExtension'")
+        Log.d("MainActivity", "DEBUG: new extension = '$newExtension'")
+        Log.d("MainActivity", "DEBUG: old currentFileName = '$currentFileName'")
+        
+        currentExtension = newExtension
+        // Update filename if it's not the default "Untitled"
+        if (currentFileName != "Untitled") {
+            val nameWithoutExt = File(currentFileName).nameWithoutExtension
+            currentFileName = "$nameWithoutExt$newExtension"
+            Log.d("MainActivity", "DEBUG: updated currentFileName = '$currentFileName'")
+        }
+        
+        Log.d("MainActivity", "DEBUG: final currentExtension = '$currentExtension'")
+    }
+    
+    /**
+     * Extract and set extension from a filename when opening files.
+     * Ensures extension state stays synchronized with opened files.
+     */
+    private fun updateExtensionFromFileName(fileName: String) {
+        val extension = File(fileName).extension
+        if (extension.isNotEmpty()) {
+            currentExtension = ".$extension"  // Add dot prefix for consistency
+        }
+    }
 
 
+}
+
+/**
+ * Extension Change Dialog
+ * ======================
+ * 
+ * Allows users to change the current file extension, which triggers:
+ * 1. Immediate syntax highlighting update
+ * 2. Compile button enable/disable based on support
+ * 3. Filename update (if not "Untitled")
+ * 
+ * TESTING:
+ * ========
+ * - Open drawer menu → "Change Extension"
+ * - Dialog should show: .kt, .java, .py options
+ * - Current extension should be highlighted/marked
+ * - Selecting new extension should update syntax highlighting immediately
+ */
+@Composable
+fun ExtensionChangeDialog(
+    currentExtension: String,
+    supportedExtensions: Set<String>,
+    onExtensionSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change File Extension") },
+        text = {
+            Column {
+                Text("Select a file extension:")
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                supportedExtensions.forEach { extension ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onExtensionSelected(extension) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = extension,
+                            modifier = Modifier.weight(1f),
+                            style = if (extension == currentExtension) {
+                                TextStyle(fontWeight = FontWeight.Bold)
+                            } else {
+                                TextStyle()
+                            }
+                        )
+                        if (extension == currentExtension) {
+                            Text("(current)", style = TextStyle(fontSize = 12.sp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 

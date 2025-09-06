@@ -58,7 +58,8 @@ fun DrawerContent(
     onSaveFile: (String) -> Unit,
     onToggleAutoSave: () -> Unit,
     onConfigure: () -> Unit = {},
-    onSourceCodeClick: () -> Unit = {}
+    onSourceCodeClick: () -> Unit = {},
+    onExtensionChange: (String) -> Unit = {}
 ) {
     var fileName = remember { mutableStateOf(initialFileName) }
     var showSaveDialog = remember { mutableStateOf(false) }
@@ -203,6 +204,30 @@ fun DrawerContent(
                 fontSize = 18.sp,
                 color = if (isConfigFile) com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue 
                         else com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+            )
+        }
+        
+        // Extension Change Option
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    onExtensionChange("")  // Empty string triggers dialog
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = ImageVector.vectorResource(id = R.drawable.configure_icon),
+                contentDescription = "Change Extension",
+                tint = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Change Extension",
+                fontSize = 18.sp,
+                color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
             )
         }
         
