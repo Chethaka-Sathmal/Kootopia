@@ -37,15 +37,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 // Composable drawer UI with options to create, open, and save files
 @Composable
 fun DrawerContent(
     initialFileName: String,
     context: Context,
+    fileManager: FileManager,
+    isConfigFile: Boolean,
     hasUnsavedChanges: Boolean,
     autoSaveEnabled: Boolean,
     onNewFile: (String) -> Unit,
@@ -53,7 +57,8 @@ fun DrawerContent(
     onOpenFile: () -> Unit,
     onSaveFile: (String) -> Unit,
     onToggleAutoSave: () -> Unit,
-    onConfigure: () -> Unit = {}
+    onConfigure: () -> Unit = {},
+    onSourceCodeClick: () -> Unit = {}
 ) {
     var fileName = remember { mutableStateOf(initialFileName) }
     var showSaveDialog = remember { mutableStateOf(false) }
@@ -62,6 +67,9 @@ fun DrawerContent(
     var showSaveConfirmation = remember { mutableStateOf(false) }
     var savedFileName = remember { mutableStateOf("") }
     var showUnsavedChangesDialog = remember { mutableStateOf(false) }
+    var showUnsavedConfigWarning = remember { mutableStateOf(false) }
+    var showUnsavedSourceWarning = remember { mutableStateOf(false) }
+    var pendingAction = remember { mutableStateOf<() -> Unit>({}) }
     val extensions = listOf(".kt", ".txt", ".java", ".py", ".js", ".html", ".css", ".xml")
     var selectedExtension = remember { mutableStateOf(extensions.first()) }
 
@@ -85,6 +93,37 @@ fun DrawerContent(
         )
         
         Spacer(modifier = Modifier.height(8.dp))
+        
+        // Source Code Button - always visible
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { 
+                    if (isConfigFile && hasUnsavedChanges) {
+                        pendingAction.value = { onSourceCodeClick() }
+                        showUnsavedConfigWarning.value = true
+                    } else {
+                        onSourceCodeClick()
+                    }
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = ImageVector.vectorResource(id = R.drawable.code_icon),
+                contentDescription = "Source Code",
+                tint = if (!isConfigFile) com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue 
+                      else com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = "Source Code",
+                fontSize = 18.sp,
+                color = if (!isConfigFile) com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue 
+                        else com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+            )
+        }
         
         // New File Button
         Row(
@@ -140,21 +179,30 @@ fun DrawerContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onConfigure() }
+                .clickable { 
+                    if (!isConfigFile && hasUnsavedChanges) {
+                        pendingAction.value = { onConfigure() }
+                        showUnsavedSourceWarning.value = true
+                    } else {
+                        onConfigure()
+                    }
+                }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = ImageVector.vectorResource(id = R.drawable.configure_icon),
                 contentDescription = "Configure",
-                tint = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
+                tint = if (isConfigFile) com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue 
+                      else com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = "Configure",
                 fontSize = 18.sp,
-                color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                color = if (isConfigFile) com.ncs.kootopia.ui.theme.KootopiaColors.accentBlue 
+                        else com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
             )
         }
         
@@ -321,6 +369,7 @@ fun DrawerContent(
     
     // Save Confirmation Dialog
     if (showSaveConfirmation.value) {
+        val saveLocation = fileManager.getSaveLocation(savedFileName.value, isConfigFile)
         AlertDialog(
             onDismissRequest = { showSaveConfirmation.value = false },
             title = { 
@@ -330,10 +379,18 @@ fun DrawerContent(
                 ) 
             },
             text = {
-                Text(
-                    "File '${savedFileName.value}' has been saved successfully!",
-                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
-                )
+                Column {
+                    Text(
+                        "File '${savedFileName.value}' has been saved successfully!",
+                        color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                    )
+                    Text(
+                        "Location: $saveLocation",
+                        color = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary,
+                        style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             },
             confirmButton = {
                 Button(
@@ -381,6 +438,92 @@ fun DrawerContent(
             dismissButton = {
                 TextButton(
                     onClick = { showUnsavedChangesDialog.value = false },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
+        )
+    }
+
+    // Unsaved Source Code Warning Dialog
+    if (showUnsavedSourceWarning.value) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedSourceWarning.value = false },
+            title = { 
+                Text(
+                    "Unsaved Changes", 
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                ) 
+            },
+            text = {
+                Text(
+                    "You have unsaved changes in your source code. If you continue, your work will be lost. Do you want to continue anyway?",
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showUnsavedSourceWarning.value = false
+                        pendingAction.value.invoke()
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.errorRed
+                    )
+                ) {
+                    Text("Continue Anyway", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showUnsavedSourceWarning.value = false },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
+                    )
+                ) {
+                    Text("Cancel")
+                }
+            },
+            containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.surfaceDark
+        )
+    }
+
+    // Unsaved Config Changes Warning Dialog
+    if (showUnsavedConfigWarning.value) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedConfigWarning.value = false },
+            title = { 
+                Text(
+                    "Unsaved Changes", 
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                ) 
+            },
+            text = {
+                Text(
+                    "You have unsaved changes in your configuration file. If you continue, your work will be lost. Do you want to continue anyway?",
+                    color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showUnsavedConfigWarning.value = false
+                        pendingAction.value.invoke()
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = com.ncs.kootopia.ui.theme.KootopiaColors.errorRed
+                    )
+                ) {
+                    Text("Continue Anyway", color = com.ncs.kootopia.ui.theme.KootopiaColors.textPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showUnsavedConfigWarning.value = false },
                     colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
                         contentColor = com.ncs.kootopia.ui.theme.KootopiaColors.textSecondary
                     )

@@ -41,6 +41,8 @@ class MainActivity : ComponentActivity() {
     private var hasUnsavedChanges by mutableStateOf(false)
     private var autoSaveEnabled by mutableStateOf(true)
     private var isEditingConfig by mutableStateOf(false)
+    private var lastSourceFileName by mutableStateOf("Untitled")
+    private var lastSourceContent by mutableStateOf("")
     
     // File picker launcher
     private val filePickerLauncher = registerForActivityResult(
@@ -103,6 +105,8 @@ class MainActivity : ComponentActivity() {
                         DrawerContent(
                             initialFileName = currentFileName,
                             context = this,
+                            fileManager = fileManager,
+                            isConfigFile = isEditingConfig,
                             hasUnsavedChanges = hasUnsavedChanges,
                             autoSaveEnabled = autoSaveEnabled,
                             onNewFile = { createNewFile(it) },
@@ -112,7 +116,8 @@ class MainActivity : ComponentActivity() {
                             onToggleAutoSave = { autoSaveEnabled = !autoSaveEnabled },
                             onConfigure = { 
                                 showConfigurationDialog = true
-                            }
+                            },
+                            onSourceCodeClick = { switchToSourceCode() }
                         )
                     }
                 ) {
@@ -121,6 +126,8 @@ class MainActivity : ComponentActivity() {
                         MainEditorScaffold(
                             currentFileName = currentFileName,
                             editorState = editorState,
+                            fileManager = fileManager,
+                            isConfigFile = isEditingConfig,
                             onMenuClick = { scope.launch { drawerState.open() } },
                             onEditClick = { showMiniToolbar = !showMiniToolbar },
                             onUndoClick = { editorState.undo() },
@@ -293,6 +300,12 @@ class MainActivity : ComponentActivity() {
 
     // Open an existing configuration file for editing
     private fun openConfigFile(configFileName: String) {
+        // Save current source code content before switching
+        if (!isEditingConfig) {
+            lastSourceFileName = currentFileName
+            lastSourceContent = editorState.textField.value.text
+        }
+        
         val content = fileManager.loadConfiguration(configFileName)
         editorState.textField.value = TextFieldValue(content)
         currentFileName = configFileName
@@ -303,6 +316,12 @@ class MainActivity : ComponentActivity() {
 
     // Create a new configuration file
     private fun createNewConfigFile(configFileName: String) {
+        // Save current source code content before switching
+        if (!isEditingConfig) {
+            lastSourceFileName = currentFileName
+            lastSourceContent = editorState.textField.value.text
+        }
+        
         // Create a template configuration file
         val templateContent = """
 {
@@ -317,6 +336,23 @@ class MainActivity : ComponentActivity() {
         isEditingConfig = true
         editorState.forceCommit()
         hasUnsavedChanges = false
+    }
+
+    // Switch to source code mode
+    private fun switchToSourceCode() {
+        if (isEditingConfig) {
+            // Save current config content
+            if (currentFileName.isNotEmpty()) {
+                saveFile(currentFileName)
+            }
+            
+            // Switch back to source code
+            isEditingConfig = false
+            currentFileName = lastSourceFileName
+            editorState.textField.value = TextFieldValue(lastSourceContent)
+            editorState.forceCommit()
+            hasUnsavedChanges = false
+        }
     }
 
 

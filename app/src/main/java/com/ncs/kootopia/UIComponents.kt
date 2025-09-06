@@ -1,6 +1,7 @@
 package com.ncs.kootopia
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Edit
@@ -76,6 +78,8 @@ import kotlinx.coroutines.launch
 fun MainEditorScaffold(
     currentFileName: String,
     editorState: TextEditorState,
+    fileManager: FileManager,
+    isConfigFile: Boolean,
     onMenuClick: () -> Unit,
     onEditClick: () -> Unit,
     onUndoClick: () -> Unit,
@@ -272,6 +276,7 @@ fun MainEditorScaffold(
     
     // Save Confirmation Dialog
     if (showSaveConfirmation) {
+        val saveLocation = fileManager.getSaveLocation(savedFileName, isConfigFile)
         AlertDialog(
             onDismissRequest = { showSaveConfirmation = false },
             title = { 
@@ -281,10 +286,18 @@ fun MainEditorScaffold(
                 ) 
             },
             text = {
-                Text(
-                    "File '$savedFileName' has been saved successfully!",
-                    color = KootopiaColors.textPrimary
-                )
+                Column {
+                    Text(
+                        "File '$savedFileName' has been saved successfully!",
+                        color = KootopiaColors.textPrimary
+                    )
+                    Text(
+                        "Location: $saveLocation",
+                        color = KootopiaColors.textSecondary,
+                        style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             },
             confirmButton = {
                 Button(

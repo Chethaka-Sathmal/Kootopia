@@ -86,4 +86,13 @@ class FileManager(private val context: Context) {
         return getConfigsDirectory().absolutePath
     }
 
+    // Get save location based on file type
+    fun getSaveLocation(fileName: String, isConfigFile: Boolean): String {
+        return if (isConfigFile) {
+            File(getConfigsDirectory(), fileName).absolutePath
+        } else {
+            File(getKootopiaDirectory(), fileName).absolutePath
+        }
+    }
+
 }
